@@ -1,37 +1,38 @@
 package main
 
 import (
-	"bytes"
 	"encoding/json"
 	"fmt"
 	"io"
 	"log"
+	"math/rand"
 	"net/http"
 	"os"
+	"time"
 
 	"github.com/joho/godotenv"
 )
 
 type Content struct {
-	Content string
-	Link    string
+	Content string `json:"content"`
+	Link    string `json:"link"`
 }
 
 type Annotations struct {
-	Bold          bool
-	Italic        bool
-	StrikeThrough bool
-	Underline     bool
-	Code          bool
-	Color         string
+	Bold          bool   `json:"bold"`
+	Italic        bool   `json:"italic"`
+	StrikeThrough bool   `json:"strikethrough"`
+	Underline     bool   `json:"underline"`
+	Code          bool   `json:"code"`
+	Color         string `json:"color"`
 }
 
 type BulletedListItemContent struct {
-	Type        string
-	Text        Content
-	Annotations Annotations
-	PlainText   string
-	href        string
+	Type        string      `json:"type"`
+	Text        Content     `json:"text"`
+	Annotations Annotations `json:"annotations"`
+	PlainText   string      `json:"plain_text"`
+	href        string      `json:"href"`
 }
 
 type BulletedListItem struct {
@@ -39,23 +40,23 @@ type BulletedListItem struct {
 }
 
 type Block struct {
-	Object         string
-	Id             string
-	CreatedTime    string
-	LastEditedTime string
-	hasChildren    bool
-	Archived       bool
-	Type           string
-	BulletedListItem
+	Object           string `json:"object"`
+	Id               string `json:"id"`
+	CreatedTime      string `json:"created_time"`
+	LastEditedTime   string `json:"last_edited_time"`
+	hasChildren      bool   `json:"has_children"`
+	Archived         bool   `json:"archived"`
+	Type             string `json:"type"`
+	BulletedListItem `json:"bulleted_list_item"`
 }
 
 type Blocks []*Block
 
 type Body struct {
-	Object     string
-	Results    Blocks
-	NextCursor string
-	hasMore    bool
+	Object     string `json:"object"`
+	Results    Blocks `json:"results"`
+	NextCursor string `json:"next_cursor"`
+	hasMore    bool   `json:"has_more"`
 }
 
 func main() {
@@ -83,26 +84,18 @@ func main() {
 
 	var body Body
 	json.Unmarshal(b, &body)
-	fmt.Println(body)
-	fmt.Println(body.Results)
 
+	var texts []string
 	for _, block := range body.Results {
-		fmt.Println(block.Object)
-		fmt.Println(block.Type)
-		fmt.Println(block.BulletedListItem)
-		for _, item := range block.BulletedListItem.Text {
-			fmt.Println(item.Type)
+		for _, content := range block.BulletedListItem.Text {
+			texts = append(texts, content.PlainText)
 		}
-		// if block.Type == "heading_1" {
-		// 	fmt.Println(block.BulletedListItems
-		// 	)
-		// }
 	}
 
-	var out bytes.Buffer
-	json.Indent(&out, b, "", " ")
-	out.WriteTo(os.Stdout)
-
+	fmt.Println(texts)
+	rand.Seed(time.Now().UnixNano())
+	num := rand.Intn(len(texts))
+	fmt.Println(texts[num])
 }
 
 // func main() {
