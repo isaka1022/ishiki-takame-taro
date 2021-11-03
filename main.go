@@ -66,23 +66,44 @@ type Title struct {
 }
 
 func main() {
+
+	var titles = FetchTitles()
+	ShowTitles(titles)
+
+	// var out bytes.Buffer
+	// json.Indent(&out, b, "", " ")
+	// out.WriteTo(os.Stdout)
+}
+
+func ShowTitles(titles []Title) {
+	fmt.Println(titles)
+	rand.Seed(time.Now().UnixNano())
+	num := rand.Intn(len(titles))
+	ShowTitle := titles[num]
+	fmt.Println(ShowTitle.Name)
+	for _, content := range ShowTitle.Contents {
+		fmt.Println(content)
+	}
+}
+
+func FetchTitles() []Title {
+	var titles []Title
+
 	err := godotenv.Load(".env")
 	if err != nil {
 		log.Fatal(err)
 	}
 	DatabaseId := os.Getenv("NOTION_DATABASE_ID")
 
-	var titles []Title
-
 	var body Body
-	var b = Request(DatabaseId)
+	var b = FetchNotion(DatabaseId)
 	json.Unmarshal(b, &body)
 
 	for _, block := range body.Results {
 		var ContentArray []string
 		if block.HasChildren == true {
 			var child_body Body
-			var b = Request(block.Id)
+			var b = FetchNotion(block.Id)
 			json.Unmarshal(b, &child_body)
 			for _, block := range child_body.Results {
 				for _, content := range block.BulletedListItem.Text {
@@ -95,21 +116,14 @@ func main() {
 		}
 	}
 
-	fmt.Println(titles)
-	rand.Seed(time.Now().UnixNano())
-	num := rand.Intn(len(titles))
-	ShowTitle := titles[num]
-	fmt.Println(ShowTitle.Name)
-	for _, content := range ShowTitle.Contents {
-		fmt.Println(content)
-	}
-
-	// var out bytes.Buffer
-	// json.Indent(&out, b, "", " ")
-	// out.WriteTo(os.Stdout)
+	return titles
 }
 
-func Request(BlockId string) []byte {
+func FetchNotion(BlockId string) []byte {
+	err := godotenv.Load(".env")
+	if err != nil {
+		log.Fatal(err)
+	}
 	ApiKey := os.Getenv("NOTION_SECRET_KEY")
 
 	client := &http.Client{}
@@ -131,12 +145,6 @@ func Request(BlockId string) []byte {
 	}
 
 	return b
-}
-
-func PlainText(body Body) []string {
-	var texts []string
-
-	return texts
 }
 
 // func main() {
