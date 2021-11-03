@@ -1,13 +1,14 @@
 package main
 
 import (
-	"bytes"
 	"encoding/json"
 	"fmt"
 	"io"
 	"log"
+	"math/rand"
 	"net/http"
 	"os"
+	"time"
 
 	"github.com/joho/godotenv"
 )
@@ -56,7 +57,12 @@ type Body struct {
 	Object     string `json:"object"`
 	Results    Blocks `json:"results"`
 	NextCursor string `json:"next_cursor"`
-	hasMore    bool   `json:"has_more"`
+	HasMore    bool   `json:"has_more"`
+}
+
+type Title struct {
+	Name     string
+	Contents []string
 }
 
 func main() {
@@ -66,31 +72,37 @@ func main() {
 	}
 	DatabaseId := os.Getenv("NOTION_DATABASE_ID")
 
-	var texts []string
+	var titles []Title
 
 	var body Body
 	var b = Request(DatabaseId)
 	json.Unmarshal(b, &body)
 
 	for _, block := range body.Results {
-		fmt.Println(block.Id)
-		fmt.Println(block.HasChildren)
+		var ContentArray []string
 		if block.HasChildren == true {
-
+			var child_body Body
+			var b = Request(block.Id)
+			json.Unmarshal(b, &child_body)
+			for _, block := range child_body.Results {
+				for _, content := range block.BulletedListItem.Text {
+					ContentArray = append(ContentArray, content.PlainText)
+				}
+			}
 		}
 		for _, content := range block.BulletedListItem.Text {
-			texts = append(texts, content.PlainText)
+			titles = append(titles, Title{content.PlainText, ContentArray})
 		}
 	}
 
-	// fmt.Println(texts)
-	// rand.Seed(time.Now().UnixNano())
-	// num := rand.Intn(len(texts))
-	// fmt.Println(texts[num])
+	fmt.Println(titles)
+	rand.Seed(time.Now().UnixNano())
+	num := rand.Intn(len(titles))
+	fmt.Println(titles[num])
 
-	var out bytes.Buffer
-	json.Indent(&out, b, "", " ")
-	out.WriteTo(os.Stdout)
+	// var out bytes.Buffer
+	// json.Indent(&out, b, "", " ")
+	// out.WriteTo(os.Stdout)
 }
 
 func Request(BlockId string) []byte {
@@ -115,6 +127,12 @@ func Request(BlockId string) []byte {
 	}
 
 	return b
+}
+
+func PlainText(body Body) []string {
+	var texts []string
+
+	return texts
 }
 
 // func main() {
