@@ -1,14 +1,13 @@
 package main
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"io"
 	"log"
-	"math/rand"
 	"net/http"
 	"os"
-	"time"
 
 	"github.com/joho/godotenv"
 )
@@ -28,11 +27,12 @@ type Annotations struct {
 }
 
 type BulletedListItemContent struct {
-	Type        string      `json:"type"`
-	Text        Content     `json:"text"`
-	Annotations Annotations `json:"annotations"`
-	PlainText   string      `json:"plain_text"`
-	href        string      `json:"href"`
+	Type        string                     `json:"type"`
+	Text        Content                    `json:"text"`
+	Children    []*BulletedListItemContent `json:"children"`
+	Annotations Annotations                `json:"annotations"`
+	PlainText   string                     `json:"plain_text"`
+	Href        string                     `json:"href"`
 }
 
 type BulletedListItem struct {
@@ -44,7 +44,7 @@ type Block struct {
 	Id               string `json:"id"`
 	CreatedTime      string `json:"created_time"`
 	LastEditedTime   string `json:"last_edited_time"`
-	hasChildren      bool   `json:"has_children"`
+	HasChildren      bool   `json:"has_children"`
 	Archived         bool   `json:"archived"`
 	Type             string `json:"type"`
 	BulletedListItem `json:"bulleted_list_item"`
@@ -61,11 +61,43 @@ type Body struct {
 
 func main() {
 	err := godotenv.Load(".env")
-	ApiKey := os.Getenv("NOTION_SECRET_KEY")
+	if err != nil {
+		log.Fatal(err)
+	}
 	DatabaseId := os.Getenv("NOTION_DATABASE_ID")
 
+	var texts []string
+
+	var body Body
+	var b = Request(DatabaseId)
+	json.Unmarshal(b, &body)
+
+	for _, block := range body.Results {
+		fmt.Println(block.Id)
+		fmt.Println(block.HasChildren)
+		if block.HasChildren == true {
+
+		}
+		for _, content := range block.BulletedListItem.Text {
+			texts = append(texts, content.PlainText)
+		}
+	}
+
+	// fmt.Println(texts)
+	// rand.Seed(time.Now().UnixNano())
+	// num := rand.Intn(len(texts))
+	// fmt.Println(texts[num])
+
+	var out bytes.Buffer
+	json.Indent(&out, b, "", " ")
+	out.WriteTo(os.Stdout)
+}
+
+func Request(BlockId string) []byte {
+	ApiKey := os.Getenv("NOTION_SECRET_KEY")
+
 	client := &http.Client{}
-	req, err := http.NewRequest("GET", "https://api.notion.com/v1/blocks/"+DatabaseId+"/children?page_size=5", nil)
+	req, err := http.NewRequest("GET", "https://api.notion.com/v1/blocks/"+BlockId+"/children?page_size=5", nil)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -82,20 +114,7 @@ func main() {
 		log.Fatal(err)
 	}
 
-	var body Body
-	json.Unmarshal(b, &body)
-
-	var texts []string
-	for _, block := range body.Results {
-		for _, content := range block.BulletedListItem.Text {
-			texts = append(texts, content.PlainText)
-		}
-	}
-
-	fmt.Println(texts)
-	rand.Seed(time.Now().UnixNano())
-	num := rand.Intn(len(texts))
-	fmt.Println(texts[num])
+	return b
 }
 
 // func main() {
