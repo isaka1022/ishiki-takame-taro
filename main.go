@@ -98,7 +98,11 @@ func main() {
 	fmt.Println(titles)
 	rand.Seed(time.Now().UnixNano())
 	num := rand.Intn(len(titles))
-	fmt.Println(titles[num])
+	ShowTitle := titles[num]
+	fmt.Println(ShowTitle.Name)
+	for _, content := range ShowTitle.Contents {
+		fmt.Println(content)
+	}
 
 	// var out bytes.Buffer
 	// json.Indent(&out, b, "", " ")
@@ -109,7 +113,7 @@ func Request(BlockId string) []byte {
 	ApiKey := os.Getenv("NOTION_SECRET_KEY")
 
 	client := &http.Client{}
-	req, err := http.NewRequest("GET", "https://api.notion.com/v1/blocks/"+BlockId+"/children?page_size=5", nil)
+	req, err := http.NewRequest("GET", "https://api.notion.com/v1/blocks/"+BlockId+"/children?page_size=100", nil)
 	if err != nil {
 		log.Fatal(err)
 	}
