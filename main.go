@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/joho/godotenv"
+	"github.com/line/line-bot-sdk-go/linebot"
 )
 
 type Content struct {
@@ -67,23 +68,28 @@ type Title struct {
 
 func main() {
 
-	var titles = FetchTitles()
-	ShowTitles(titles)
+	http.HandleFunc("/callback", lineHandler)
+
+	fmt.Println("https://localhost:8080 で起動中...")
+
+	log.Fatal(http.ListenAndServe(":8080", nil))
 
 	// var out bytes.Buffer
 	// json.Indent(&out, b, "", " ")
 	// out.WriteTo(os.Stdout)
 }
 
-func ShowTitles(titles []Title) {
-	fmt.Println(titles)
+func ShowTitles(titles []Title) string {
+
 	rand.Seed(time.Now().UnixNano())
 	num := rand.Intn(len(titles))
 	ShowTitle := titles[num]
-	fmt.Println(ShowTitle.Name)
+	texts := ShowTitle.Name
 	for _, content := range ShowTitle.Contents {
-		fmt.Println(content)
+		texts += content
 	}
+
+	return texts
 }
 
 func FetchTitles() []Title {
@@ -102,14 +108,7 @@ func FetchTitles() []Title {
 	for _, block := range body.Results {
 		var ContentArray []string
 		if block.HasChildren == true {
-			var child_body Body
-			var b = FetchNotion(block.Id)
-			json.Unmarshal(b, &child_body)
-			for _, block := range child_body.Results {
-				for _, content := range block.BulletedListItem.Text {
-					ContentArray = append(ContentArray, content.PlainText)
-				}
-			}
+			FetchContentsByBlockId(block.Id)
 		}
 		for _, content := range block.BulletedListItem.Text {
 			titles = append(titles, Title{content.PlainText, ContentArray})
@@ -117,6 +116,20 @@ func FetchTitles() []Title {
 	}
 
 	return titles
+}
+
+func FetchContentsByBlockId(BlockId string) []string {
+	var contents []string
+	var child_body Body
+	var b = FetchNotion(BlockId)
+
+	json.Unmarshal(b, &child_body)
+	for _, block := range child_body.Results {
+		for _, content := range block.BulletedListItem.Text {
+			contents = append(contents, content.PlainText)
+		}
+	}
+	return contents
 }
 
 func FetchNotion(BlockId string) []byte {
@@ -147,64 +160,41 @@ func FetchNotion(BlockId string) []byte {
 	return b
 }
 
-// func main() {
-// 	http.HandleFunc("/", helloHandler)
-// 	http.HandleFunc("/callback", lineHandler)
+func lineHandler(w http.ResponseWriter, r *http.Request) {
+	err := godotenv.Load(".env")
+	if err != nil {
+		log.Fatal(err)
+	}
+	SecretToken := os.Getenv("LINE_CANNEL_SECRET_TOKEN")
+	AccessToken := os.Getenv("LINE_CHANNEL_ACCESS_TOKEN")
+	bot, err := linebot.New(
+		SecretToken,
+		AccessToken,
+	)
+	if err != nil {
+		log.Fatal(err)
+	}
 
-// 	fmt.Println("https://localhost:8080 で起動中...")
+	events, err := bot.ParseRequest(r)
+	if err != nil {
+		if err == linebot.ErrInvalidSignature {
+			w.WriteHeader(400)
+		} else {
+			w.WriteHeader(500)
+		}
+	}
 
-// 	log.Fatal(http.ListenAndServe(":8080", nil))
-// }
-
-// func helloHandler(w http.ResponseWriter, r *http.Request) {
-// 	msg := "Hello world!!!!"
-// 	fmt.Fprintf(w, msg)
-// }
-
-// func lineHandler(w http.ResponseWriter, r *http.Request) {
-// 	bot, err := linebot.New(
-// 		"8d269eda5acfc678f48a4e9d0ea0fd55",
-// 		"KHWIbLhXzgRLS6zqDclV6jFBPZODnu8jIYBmvGA3bWQFug6v0xdhgvVy+1ujPrN0rEWnrnbfX1bDpz4C7FmbWYBB19ne2Mm/F5uIL5WmXXFsGWXZa2qEp8yjP6SnKcTBszzK2SlTIqDPKpV9hqWtawdB04t89/1O/w1cDnyilFU=",
-// 	)
-// 	if err != nil {
-// 		log.Fatal(err)
-// 	}
-
-// 	events, err := bot.ParseRequest(r)
-// 	if err != nil {
-// 		if err == linebot.ErrInvalidSignature {
-// 			w.WriteHeader(400)
-// 		} else {
-// 			w.WriteHeader(500)
-// 		}
-// 	}
-
-// 	for _, event := range events {
-// 		if event.Type == linebot.EventTypeMessage {
-// 			switch message := event.Message.(type) {
-// 			case *linebot.TextMessage:
-// 				replyMessage := message.Text
-// 				_, err = bot.ReplyMessage(event.ReplyToken, linebot.NewTextMessage(replyMessage)).Do()
-// 				if err != nil {
-// 					log.Print(err)
-// 				}
-
-// 			case *linebot.LocationMessage:
-// 				sendRestoInfo(bot, event)
-// 			}
-// 		}
-// 	}
-// }
-
-// func sendRestoInfo(bot *linebot.Client, e *linebot.Event) {
-// 	msg := e.Message.(*linebot.LocationMessage)
-
-// 	let := strconv.FormatFloat(msg.Latitude, 'f', 2, 64)
-// 	lng := strconv.FormatFloat(msg.Longitude, 'f', 2, 64)
-
-// 	replyMsg := fmt.Sprintf("緯度：%s\n経度： %s", let, lng)
-
-// 	_, err := bot.ReplyMessage(e.ReplyToken, linebot.NewTextMessage(replyMsg)).Do()
-// 	if err != nil {
-// 		log.Print(err)
-// 	}
+	for _, event := range events {
+		if event.Type == linebot.EventTypeMessage {
+			switch event.Message.(type) {
+			case *linebot.TextMessage:
+				var titles = FetchTitles()
+				sendMessage := ShowTitles(titles)
+				_, err = bot.ReplyMessage(event.ReplyToken, linebot.NewTextMessage(sendMessage)).Do()
+				if err != nil {
+					log.Print(err)
+				}
+			}
+		}
+	}
+}
