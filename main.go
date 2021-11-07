@@ -10,7 +10,6 @@ import (
 	"os"
 	"time"
 
-	"github.com/joho/godotenv"
 	"github.com/line/line-bot-sdk-go/linebot"
 )
 
@@ -96,10 +95,6 @@ func ShowTitles(titles []Title) string {
 func FetchTitles() []Title {
 	var titles []Title
 
-	err := godotenv.Load(".env")
-	if err != nil {
-		log.Fatal(err)
-	}
 	DatabaseId := os.Getenv("NOTION_DATABASE_ID")
 
 	var body Body
@@ -134,10 +129,6 @@ func FetchContentsByBlockId(BlockId string) []string {
 }
 
 func FetchNotion(BlockId string) []byte {
-	err := godotenv.Load(".env")
-	if err != nil {
-		log.Fatal(err)
-	}
 	ApiKey := os.Getenv("NOTION_SECRET_KEY")
 
 	client := &http.Client{}
@@ -162,10 +153,6 @@ func FetchNotion(BlockId string) []byte {
 }
 
 func lineHandler(w http.ResponseWriter, r *http.Request) {
-	err := godotenv.Load(".env")
-	if err != nil {
-		log.Fatal(err)
-	}
 	SecretToken := os.Getenv("LINE_CANNEL_SECRET_TOKEN")
 	AccessToken := os.Getenv("LINE_CHANNEL_ACCESS_TOKEN")
 	bot, err := linebot.New(
