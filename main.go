@@ -67,12 +67,13 @@ type Title struct {
 }
 
 func main() {
+	PortNum := os.Getenv("PORT")
 
 	http.HandleFunc("/callback", lineHandler)
 
-	fmt.Println("https://localhost:8080 で起動中...")
+	fmt.Println("https://localhost:" + PortNum + "で起動中...")
 
-	log.Fatal(http.ListenAndServe(":8080", nil))
+	log.Fatal(http.ListenAndServe(":"+PortNum, nil))
 
 	// var out bytes.Buffer
 	// json.Indent(&out, b, "", " ")
