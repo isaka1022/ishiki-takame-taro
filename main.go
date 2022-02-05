@@ -42,6 +42,10 @@ type BulletedListItem struct {
 	Text []*BulletedListItemContent
 }
 
+type ChildPage struct {
+	Text []*BulletedListItemContent
+}
+
 type Block struct {
 	Object           string `json:"object"`
 	Id               string `json:"id"`
@@ -51,6 +55,7 @@ type Block struct {
 	Archived         bool   `json:"archived"`
 	Type             string `json:"type"`
 	BulletedListItem `json:"bulleted_list_item"`
+	ChildPage `json:"child_page"`
 }
 
 type Blocks []*Block
@@ -71,64 +76,37 @@ func main() {
 	fmt.Println("https://localhost:" + PortNum + "で起動中...")
 
 	log.Fatal(http.ListenAndServe(":"+PortNum, nil))
-
-	// var out bytes.Buffer
-	// json.Indent(&out, b, "", " ")
-	// out.WriteTo(os.Stdout)
 }
 
-func ShowTitles(titles [][]string) string {
-
-	// TODO: ランダムで一つ選ぶ
-	rand.Seed(time.Now().UnixNano())
-	num := rand.Intn(len(titles))
-
-	messages := titles[num]
-	return strings.Join(messages, "\n・")
-}
-
-//すべてのブロックのIDを集める
-func FetchTitles() [][]string {
-	//TODO DBの数は増やしていくようにする
-	DatabaseId := os.Getenv("NOTION_DATABASE_ID")
-	titles := GetContents(DatabaseId)
-	return titles
-}
-
-// 中身を解析する
-func GetContents(blockId string) [][]string {
-	var titles [][]string
+// 中身を取得する
+func GetContents(blockId string, isOnlyId bool) []string {
+	var ids []string
+	var messages []string
 	var body Body
-	var b = FetchNotion(blockId)
+	var b = FetchChild(blockId)
 	json.Unmarshal(b, &body)
 
+	fmt.Println("into GetContents")
+
 	for _, block := range body.Results {
-		var ContentArray []string
+		ids = append(ids, block.Id)
+		var childContents []string
 		for _, content := range block.BulletedListItem.Text {
-			if block.HasChildren == true {
-				ContentArray = FetchContentsByBlockId(block.Id)
+			if block.HasChildren == true && !isOnlyId {
+				childContents = GetContents(block.Id, false)
 			}
-			titles = append(titles, append([]string{content.PlainText}, ContentArray...))
+			messages = append([]string{content.PlainText}, childContents...)
 		}
 	}
-	return titles
-}
-
-func FetchContentsByBlockId(BlockId string) []string {
-	var contents []string
-	var child_body Body
-	var b = FetchNotion(BlockId)
-
-	json.Unmarshal(b, &child_body)
-	for _, block := range child_body.Results {
-		for _, content := range block.BulletedListItem.Text {
-			contents = append(contents, content.PlainText)
-		}
+	if isOnlyId {
+		return ids
 	}
-	return contents
+	fmt.Println("messages")
+	fmt.Println(messages)
+	return messages
 }
 
-func FetchNotion(BlockId string) []byte {
+func FetchChild(BlockId string) []byte {
 	ApiKey := os.Getenv("NOTION_SECRET_KEY")
 
 	client := &http.Client{}
@@ -152,10 +130,28 @@ func FetchNotion(BlockId string) []byte {
 	return b
 }
 
+// ランダムで一つ選ぶ
+func SelectId(ids []string) string {
+	fmt.Println("into SelectId")
+
+	rand.Seed(time.Now().UnixNano())
+	num := rand.Intn(len(ids))
+	return ids[num]
+}
+
+func FormatMessage(id string) string {
+	fmt.Println("into FormatMessage")
+
+	message := GetContents(id, false)
+	fmt.Println("before return")
+	return strings.Join(message, "\n・")
+}
+
 func lineHandler(w http.ResponseWriter, r *http.Request) {
 	fmt.Println("called")
 	SecretToken := os.Getenv("LINE_CANNEL_SECRET_TOKEN")
 	AccessToken := os.Getenv("LINE_CHANNEL_ACCESS_TOKEN")
+	DatabaseId := os.Getenv("NOTION_DATABASE_ID")
 	bot, err := linebot.New(
 		SecretToken,
 		AccessToken,
@@ -177,11 +173,28 @@ func lineHandler(w http.ResponseWriter, r *http.Request) {
 		if event.Type == linebot.EventTypeMessage {
 			switch event.Message.(type) {
 			case *linebot.TextMessage:
-				var titles = FetchTitles()
-				sendMessage := ShowTitles(titles)
+				// _, err = bot.pushMessage(event.ReplyToken, linebot.NewTextMessage("考え中...")).Do()
+				if err != nil {
+					log.Print(err)
+				}
+				pageIds := GetContents(DatabaseId, true)
+				fmt.Println("pageIds")
+				fmt.Println(pageIds)
+				pageId := SelectId(pageIds)
+				fmt.Println("pageId")
+				fmt.Println(pageId)
+				blockIds := GetContents(pageId, true)
+				fmt.Println("blockIds")
+				fmt.Println(blockIds)
+
+				blockId := SelectId(blockIds)
+				fmt.Println("blockId")
+				fmt.Println(blockId)
+				sendMessage := FormatMessage(blockId)
 				_, err = bot.ReplyMessage(event.ReplyToken, linebot.NewTextMessage(sendMessage)).Do()
 				if err != nil {
 					log.Print(err)
+					bot.ReplyMessage(event.ReplyToken, linebot.NewTextMessage("失敗しました。")).Do()
 				}
 			}
 		}
