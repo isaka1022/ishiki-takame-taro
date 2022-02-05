@@ -62,11 +62,6 @@ type Body struct {
 	HasMore    bool   `json:"has_more"`
 }
 
-type Title struct {
-	Name     string
-	Contents []string
-}
-
 func main() {
 	godotenv.Load(".env")
 	PortNum := os.Getenv("PORT")
@@ -82,24 +77,29 @@ func main() {
 	// out.WriteTo(os.Stdout)
 }
 
-func ShowTitles(titles []Title) string {
+func ShowTitles(titles [][]string) string {
 
+	// TODO: ランダムで一つ選ぶ
 	rand.Seed(time.Now().UnixNano())
 	num := rand.Intn(len(titles))
-	ShowTitle := titles[num]
-	texts := ShowTitle.Contents
-	texts = append([]string{ShowTitle.Name}, texts...)
 
-	return strings.Join(texts, "\n・")
+	messages := titles[num]
+	return strings.Join(messages, "\n・")
 }
 
-func FetchTitles() []Title {
-	var titles []Title
-
+//すべてのブロックのIDを集める
+func FetchTitles() [][]string {
+	//TODO DBの数は増やしていくようにする
 	DatabaseId := os.Getenv("NOTION_DATABASE_ID")
+	titles := GetContents(DatabaseId)
+	return titles
+}
 
+// 中身を解析する
+func GetContents(blockId string) [][]string {
+	var titles [][]string
 	var body Body
-	var b = FetchNotion(DatabaseId)
+	var b = FetchNotion(blockId)
 	json.Unmarshal(b, &body)
 
 	for _, block := range body.Results {
@@ -108,10 +108,9 @@ func FetchTitles() []Title {
 			if block.HasChildren == true {
 				ContentArray = FetchContentsByBlockId(block.Id)
 			}
-			titles = append(titles, Title{content.PlainText, ContentArray})
+			titles = append(titles, append([]string{content.PlainText}, ContentArray...))
 		}
 	}
-	fmt.Println(titles)
 	return titles
 }
 
