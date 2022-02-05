@@ -9,8 +9,10 @@ import (
 	"net/http"
 	"os"
 	"time"
+	"strings"
 
 	"github.com/line/line-bot-sdk-go/linebot"
+	"github.com/joho/godotenv"
 )
 
 type Content struct {
@@ -66,6 +68,7 @@ type Title struct {
 }
 
 func main() {
+	godotenv.Load(".env")
 	PortNum := os.Getenv("PORT")
 
 	http.HandleFunc("/callback", lineHandler)
@@ -84,12 +87,10 @@ func ShowTitles(titles []Title) string {
 	rand.Seed(time.Now().UnixNano())
 	num := rand.Intn(len(titles))
 	ShowTitle := titles[num]
-	texts := ShowTitle.Name
-	for _, content := range ShowTitle.Contents {
-		texts += content
-	}
+	texts := ShowTitle.Contents
+	texts = append([]string{ShowTitle.Name}, texts...)
 
-	return texts
+	return strings.Join(texts, "\n・")
 }
 
 func FetchTitles() []Title {
@@ -103,14 +104,14 @@ func FetchTitles() []Title {
 
 	for _, block := range body.Results {
 		var ContentArray []string
-		if block.HasChildren == true {
-			FetchContentsByBlockId(block.Id)
-		}
 		for _, content := range block.BulletedListItem.Text {
+			if block.HasChildren == true {
+				ContentArray = FetchContentsByBlockId(block.Id)
+			}
 			titles = append(titles, Title{content.PlainText, ContentArray})
 		}
 	}
-
+	fmt.Println(titles)
 	return titles
 }
 
@@ -153,6 +154,7 @@ func FetchNotion(BlockId string) []byte {
 }
 
 func lineHandler(w http.ResponseWriter, r *http.Request) {
+	fmt.Println("called")
 	SecretToken := os.Getenv("LINE_CANNEL_SECRET_TOKEN")
 	AccessToken := os.Getenv("LINE_CHANNEL_ACCESS_TOKEN")
 	bot, err := linebot.New(
